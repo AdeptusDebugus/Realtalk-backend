@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-lesson-attempts-columns
+      author: codex
+      changes:
+        - addColumn:
+            tableName: lessons
+            columns:
+              - column:
+                  name: gladia_attempts
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: llm_attempts
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false

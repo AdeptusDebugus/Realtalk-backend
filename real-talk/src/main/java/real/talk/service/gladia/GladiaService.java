@@ -1,4 +1,4 @@
-package real.talk.service.transcription;
+package real.talk.service.gladia;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

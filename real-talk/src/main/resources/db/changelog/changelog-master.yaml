@@ -37,3 +37,5 @@ databaseChangeLog:
       file: db/changelog/changelog-lesson-segments.yaml
   - include:
       file: db/changelog/changelog-words-translation-nullable.yaml
+  - include:
+      file: db/changelog/changelog-lesson-attempts.yaml

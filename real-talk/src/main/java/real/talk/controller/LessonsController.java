@@ -3,6 +3,7 @@ package real.talk.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import real.talk.model.dto.lesson.*;
 import real.talk.model.entity.Lesson;
@@ -96,6 +97,15 @@ class LessonsController {
     @GetMapping("/{lessonId}")
     public ResponseEntity<LessonFullResponse> getLessonById(@PathVariable UUID lessonId) {
         return ResponseEntity.ok(lessonService.getLessonFullById(lessonId));
+    }
+
+    @DeleteMapping("/{lessonId}")
+    public ResponseEntity<Void> deleteLesson(@AuthenticationPrincipal User user, @PathVariable UUID lessonId) {
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
+        lessonService.deletePendingLesson(user.getUserId(), lessonId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{lessonId}/share")

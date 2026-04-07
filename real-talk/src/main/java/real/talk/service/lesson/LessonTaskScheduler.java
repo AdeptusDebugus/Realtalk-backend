@@ -14,7 +14,7 @@ import real.talk.model.entity.LlmData;
 import real.talk.model.entity.User;
 import real.talk.model.entity.enums.LessonStatus;
 import real.talk.service.llm.LlmDataService;
-import real.talk.service.transcription.GladiaService;
+import real.talk.service.gladia.GladiaService;
 import real.talk.service.user.UserService;
 
 import java.util.List;

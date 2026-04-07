@@ -1,4 +1,4 @@
-package real.talk.service.transcription;
+package real.talk.service.gladia;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,13 +22,18 @@ import static java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor;
 @Slf4j
 public class GladiaTaskScheduler {
 
+    private static final int MAX_ATTEMPTS = 3;
+
     private final TranscriptionService transcriptionService;
     private final GladiaService gladiaService;
     private final LessonService lessonService;
 
     @Scheduled(cron = "${gladia.create-request.cron}")
     public void processGladiaRequest() {
-        List<Lesson> pendingLessons = lessonService.getPendingLessons();
+        List<Lesson> pendingLessons = lessonService.getPendingLessons()
+                .stream()
+                .filter( it -> it.getCreatedAt().isBefore(Instant.now().minusSeconds(60)))
+                .toList();
 
         if (pendingLessons == null || pendingLessons.isEmpty())
             return;
@@ -41,8 +46,10 @@ public class GladiaTaskScheduler {
     }
 
     private void processLessonRequest(Lesson lesson) {
+        int nextAttempt = (lesson.getGladiaAttempts() == null ? 0 : lesson.getGladiaAttempts()) + 1;
+        lesson.setGladiaAttempts(nextAttempt);
         try {
-            log.info("Processing lesson {}", lesson.getId());
+            log.info("Processing lesson {} (Gladia attempt {}/{})", lesson.getId(), nextAttempt, MAX_ATTEMPTS);
             if (lesson.getYoutubeUrl() == null || lesson.getYoutubeUrl().isBlank()) {
                 lesson.setStatus(LessonStatus.ERROR);
                 lessonService.saveLesson(lesson);
@@ -60,9 +67,16 @@ public class GladiaTaskScheduler {
             lessonService.saveLesson(lesson);
             log.info("Finished processing lesson {}", lesson.getId());
         } catch (Exception e) {
-            lesson.setStatus(LessonStatus.ERROR);
+            if (nextAttempt >= MAX_ATTEMPTS) {
+                lesson.setStatus(LessonStatus.ERROR);
+                log.error("Lesson {} reached max Gladia attempts ({}). Marked as ERROR", lesson.getId(),
+                        MAX_ATTEMPTS, e);
+            } else {
+                lesson.setStatus(LessonStatus.PENDING);
+                log.warn("Lesson {} Gladia attempt {}/{} failed. Will retry", lesson.getId(), nextAttempt,
+                        MAX_ATTEMPTS, e);
+            }
             lessonService.saveLesson(lesson);
-            log.error("Error processing lesson {}", lesson.getId(), e);
         }
     }
 
@@ -92,7 +106,21 @@ public class GladiaTaskScheduler {
                 log.info("Finished processing gladiaRequest {}", gladiaData.getGladiaRequestId());
             }
         } catch (Exception e) {
-            log.error("Error checking response for {}", gladiaData.getGladiaRequestId(), e);
+            Lesson lesson = gladiaData.getLesson();
+            int nextAttempt = (lesson.getGladiaAttempts() == null ? 0 : lesson.getGladiaAttempts()) + 1;
+            lesson.setGladiaAttempts(nextAttempt);
+            if (nextAttempt >= MAX_ATTEMPTS) {
+                lesson.setStatus(LessonStatus.ERROR);
+                gladiaData.setStatus(DataStatus.ERROR);
+                lessonService.saveLesson(lesson);
+                gladiaService.saveGladiaData(gladiaData);
+                log.error("Lesson {} reached max Gladia attempts ({}) while checking response. Marked as ERROR",
+                        lesson.getId(), MAX_ATTEMPTS, e);
+            } else {
+                lessonService.saveLesson(lesson);
+                log.warn("Error checking response for {} (Gladia attempt {}/{})",
+                        gladiaData.getGladiaRequestId(), nextAttempt, MAX_ATTEMPTS, e);
+            }
         }
     }
 }

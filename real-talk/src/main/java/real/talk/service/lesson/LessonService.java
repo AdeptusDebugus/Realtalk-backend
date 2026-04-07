@@ -6,6 +6,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import real.talk.model.dto.lesson.*;
 import real.talk.model.entity.Lesson;
 import real.talk.model.entity.User;
@@ -310,5 +311,21 @@ public class LessonService {
 
     public List<LessonLiteResponse> getSharedLessons(User user) {
         return lessonRepository.findSharedLessons(user.getUserId());
+    }
+
+    @Transactional
+    public void deletePendingLesson(UUID userId, UUID lessonId) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new AccessControlService.AccessDeniedException("Lesson not found"));
+
+        if (!lesson.getUser().getUserId().equals(userId)) {
+            throw new AccessControlService.AccessDeniedException("You can delete only your own lessons");
+        }
+
+        if (lesson.getStatus() != LessonStatus.PENDING) {
+            throw new AccessControlService.AccessDeniedException("Only PENDING lessons can be deleted");
+        }
+
+        lessonRepository.delete(lesson);
     }
 }

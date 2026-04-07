@@ -78,6 +78,12 @@ public class Lesson {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    @Column(name = "gladia_attempts", nullable = false)
+    private Integer gladiaAttempts = 0;
+
+    @Column(name = "llm_attempts", nullable = false)
+    private Integer llmAttempts = 0;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "lesson_shared_users", joinColumns = @JoinColumn(name = "lesson_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
     private java.util.Set<User> sharedUsers = new java.util.HashSet<>();
