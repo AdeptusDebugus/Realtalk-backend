@@ -16,7 +16,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("api/v1/folders")
 class FolderController {
-
     private final FolderService folderService;
     private final FolderLessonService folderLessonService;
 
