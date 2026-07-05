@@ -44,7 +44,7 @@ gladia:
   get-response:
     cron: "0 */5 * * * ?"
   api:
-    key: 501b18d0-e068-4d15-a83b-b2535ae035ff
+    key: 1bbce0b4-c67d-4cfc-902d-2b6b5e69fcf8
 
 llm:
   generate-lesson:
