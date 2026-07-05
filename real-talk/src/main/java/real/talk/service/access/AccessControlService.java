@@ -45,11 +45,7 @@ public class AccessControlService {
         } catch (AccessDeniedException e) {
             // Specific check for scenarios
             // checkBuilderAccess(user, true) throws if no Plus plan
-            if(user.getRole() == UserRole.STUDENT){
-                canUseScenarios = true;
-            } else {
-                canUseScenarios = false;
-            }
+            canUseScenarios = false;
         }
 
         UserAccessDto.Permissions perms = new UserAccessDto.Permissions(
