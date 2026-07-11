@@ -13,7 +13,12 @@ import real.talk.model.entity.User;
 import real.talk.model.entity.enums.LessonAccess;
 import real.talk.model.entity.enums.LessonStatus;
 import real.talk.model.entity.enums.UserRole;
+import real.talk.repository.folder.FolderLessonRepository;
+import real.talk.repository.gladia.GladiaDataRepository;
+import real.talk.repository.history.UserLessonHistoryRepository;
 import real.talk.repository.lesson.LessonRepository;
+import real.talk.repository.like.LessonLikeRepository;
+import real.talk.repository.llm.LlmDataRepository;
 import real.talk.repository.user.UserRepository;
 import real.talk.service.access.AccessControlService;
 
@@ -32,6 +37,11 @@ public class LessonService {
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
     private final AccessControlService accessControlService;
+    private final LessonLikeRepository lessonLikeRepository;
+    private final FolderLessonRepository folderLessonRepository;
+    private final UserLessonHistoryRepository userLessonHistoryRepository;
+    private final GladiaDataRepository gladiaDataRepository;
+    private final LlmDataRepository llmDataRepository;
 
     public Lesson createLesson(User user, LessonCreateRequest lessonRequest) {
         // Access Check
@@ -311,6 +321,28 @@ public class LessonService {
             throw new AccessControlService.AccessDeniedException("Only PENDING lessons can be deleted");
         }
 
+        lessonRepository.delete(lesson);
+    }
+
+    @Transactional
+    public void deleteReadyLesson(UUID userId, UUID lessonId) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new AccessControlService.AccessDeniedException("Lesson not found"));
+
+        if (!lesson.getUser().getUserId().equals(userId)) {
+            throw new AccessControlService.AccessDeniedException("You can delete only your own lessons");
+        }
+
+        if (lesson.getStatus() != LessonStatus.READY) {
+            throw new AccessControlService.AccessDeniedException("Only READY lessons can be deleted");
+        }
+
+        lesson.getSharedUsers().clear();
+        lessonLikeRepository.deleteAllByLesson(lesson);
+        folderLessonRepository.deleteAllByLesson(lesson);
+        userLessonHistoryRepository.deleteAllByLesson(lesson);
+        gladiaDataRepository.deleteByLesson(lesson);
+        llmDataRepository.deleteByLesson(lesson);
         lessonRepository.delete(lesson);
     }
 }

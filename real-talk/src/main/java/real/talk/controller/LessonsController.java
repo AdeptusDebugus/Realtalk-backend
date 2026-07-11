@@ -91,6 +91,15 @@ class LessonsController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{lessonId}/ready")
+    public ResponseEntity<Void> deleteReadyLesson(@AuthenticationPrincipal User user, @PathVariable UUID lessonId) {
+        if (user == null) {
+            return ResponseEntity.status(401).build();
+        }
+        lessonService.deleteReadyLesson(user.getUserId(), lessonId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{lessonId}/share")
     public ResponseEntity<Void> shareLesson(@PathVariable UUID lessonId, @RequestParam UUID studentId) {
         lessonService.shareLesson(lessonId, studentId);

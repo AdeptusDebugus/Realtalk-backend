@@ -77,3 +77,23 @@ databaseChangeLog:
               - column:
                   name: updated_at
                   type: timestamp
+  - changeSet:
+      id: add-trial-minute-deferral-to-subscriptions
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            - columnExists:
+                tableName: subscriptions
+                columnName: trial_minutes_unlock_at
+      changes:
+        - addColumn:
+            tableName: subscriptions
+            columns:
+              - column:
+                  name: trial_minutes_unlock_at
+                  type: timestamp
+              - column:
+                  name: deferred_lesson_builder_minutes
+                  type: int
+                  defaultValueNumeric: 0

@@ -14,6 +14,7 @@ public interface FolderLessonRepository extends JpaRepository<FolderLesson, Long
     List<FolderLesson> findAllByFolderId(Long folderId);
     Optional<FolderLesson> findByFolderAndLesson(Folder folder, Lesson lesson);
     void deleteAllByFolder(Folder folder);
+    void deleteAllByLesson(Lesson lesson);
     int countByFolder(Folder folder);
 
     @Query("""

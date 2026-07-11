@@ -28,6 +28,8 @@ public class SubscriptionExpirationScheduler {
     @Transactional
     public void resetLessonBuilderMinutesForExpiredCanceledSubscriptions() {
         Instant now = Instant.now();
+        releaseUnlockedTrialMinutes(now);
+
         List<Subscription> expiredSubscriptions = subscriptionRepository.findExpiredSubscriptionsWithRemainingMinutes(
                 List.of(SubscriptionStatus.canceled, SubscriptionStatus.deleted),
                 now);
@@ -49,6 +51,37 @@ public class SubscriptionExpirationScheduler {
             userService.saveUser(user);
             log.info("Reset lesson builder minutes for user {} after subscription {} ended",
                     user.getEmail(), subscription.getPaddleSubscriptionId());
+        }
+    }
+
+    private void releaseUnlockedTrialMinutes(Instant now) {
+        List<Subscription> subscriptions = subscriptionRepository.findSubscriptionsWithUnlockedTrialMinutes(
+                List.of(SubscriptionStatus.active, SubscriptionStatus.trialing),
+                now);
+
+        for (Subscription subscription : subscriptions) {
+            User user = subscription.getUser();
+            if (user == null) {
+                log.warn("Subscription {} has unlocked trial minutes but no user",
+                        subscription.getPaddleSubscriptionId());
+                continue;
+            }
+
+            int deferredMinutes = subscription.getDeferredLessonBuilderMinutes() != null
+                    ? subscription.getDeferredLessonBuilderMinutes()
+                    : 0;
+            if (deferredMinutes <= 0) {
+                continue;
+            }
+
+            int currentMinutes = user.getLessonBuilderMinutes() != null ? user.getLessonBuilderMinutes() : 0;
+            user.setLessonBuilderMinutes(currentMinutes + deferredMinutes);
+            subscription.setDeferredLessonBuilderMinutes(0);
+            subscription.setUpdatedAt(now);
+            userService.saveUser(user);
+            subscriptionRepository.save(subscription);
+
+            log.info("Released {} deferred trial minutes for user {}", deferredMinutes, user.getEmail());
         }
     }
 

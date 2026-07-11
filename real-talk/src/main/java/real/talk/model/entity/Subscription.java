@@ -40,6 +40,12 @@ public class Subscription {
     @Column(name = "next_billed_at")
     private Instant nextBilledAt;
 
+    @Column(name = "trial_minutes_unlock_at")
+    private Instant trialMinutesUnlockAt;
+
+    @Column(name = "deferred_lesson_builder_minutes")
+    private Integer deferredLessonBuilderMinutes = 0;
+
     @Column(name = "created_at")
     private Instant createdAt;
 

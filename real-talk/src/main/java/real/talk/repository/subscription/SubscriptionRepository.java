@@ -29,4 +29,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     List<Subscription> findExpiredSubscriptionsWithRemainingMinutes(
             @Param("statuses") Collection<SubscriptionStatus> statuses,
             @Param("now") Instant now);
+
+    @Query("""
+            select s from Subscription s
+            where coalesce(s.deferredLessonBuilderMinutes, 0) > 0
+              and s.trialMinutesUnlockAt is not null
+              and s.trialMinutesUnlockAt <= :now
+              and s.status in :statuses
+            """)
+    List<Subscription> findSubscriptionsWithUnlockedTrialMinutes(
+            @Param("statuses") Collection<SubscriptionStatus> statuses,
+            @Param("now") Instant now);
 }

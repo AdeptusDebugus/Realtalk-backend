@@ -17,6 +17,8 @@ public interface LessonLikeRepository extends JpaRepository<UserLessonLike, UUID
 
     void deleteByUserAndLesson(User user, Lesson lesson);
 
+    void deleteAllByLesson(Lesson lesson);
+
     boolean existsByUserAndLesson(User user, Lesson lesson);
 
     @Query("SELECT ll FROM UserLessonLike ll " +

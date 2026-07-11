@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 import real.talk.model.dto.history.LessonHistoryResponse;
+import real.talk.model.entity.Lesson;
 import real.talk.model.entity.UserLessonHistory;
 import real.talk.model.entity.enums.LessonAccess;
 import real.talk.model.entity.enums.LessonStatus;
@@ -17,6 +18,8 @@ import java.util.UUID;
 
 public interface UserLessonHistoryRepository extends JpaRepository<UserLessonHistory, Long> {
     long countUserLessonHistoriesByUserId(UUID userId);
+
+    void deleteAllByLesson(Lesson lesson);
 
     @Query(
             """

@@ -23,6 +23,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -64,6 +65,8 @@ public class PaddleService {
     @Value("${paddle.price.100-mins-plus:}")
     private String mins100PlusPriceId;
 
+    private static final int TRIAL_AVAILABLE_MINUTES = 60;
+    private static final long TRIAL_DEFERRED_MINUTES_DELAY_DAYS = 7;
 
     private SubscriptionPlan determinePlan(JsonNode data) {
         // Parse items to find priceId
@@ -82,19 +85,43 @@ public class PaddleService {
         return SubscriptionPlan.OPEN_LIBRARY; // default
     }
 
-    private void updateUserLimits(User user, SubscriptionPlan plan, SubscriptionStatus status) {
+    private void updateUserLimits(User user, Subscription subscription) {
+        SubscriptionPlan plan = subscription.getPlan();
+        SubscriptionStatus status = subscription.getStatus();
         if (status != SubscriptionStatus.active && status != SubscriptionStatus.trialing) {
             return;
         }
 
-        if (plan == SubscriptionPlan.SMART) {
-            if (user.getLessonBuilderMinutes() == null || user.getLessonBuilderMinutes() < 300) {
-                user.setLessonBuilderMinutes(300);
+        int planMinutes = getPlanLessonBuilderMinutes(plan);
+        if (status == SubscriptionStatus.trialing && planMinutes > TRIAL_AVAILABLE_MINUTES) {
+            Instant unlockAt = subscription.getTrialMinutesUnlockAt();
+            if (unlockAt == null) {
+                unlockAt = getTrialMinutesUnlockAt(subscription);
+                subscription.setTrialMinutesUnlockAt(unlockAt);
+                subscription.setDeferredLessonBuilderMinutes(planMinutes - TRIAL_AVAILABLE_MINUTES);
             }
-        } else if (plan == SubscriptionPlan.PLUS) {
-            if (user.getLessonBuilderMinutes() == null || user.getLessonBuilderMinutes() < 600) {
-                user.setLessonBuilderMinutes(600);
+
+            if (Instant.now().isBefore(unlockAt)) {
+                ensureMinimumMinutes(user, TRIAL_AVAILABLE_MINUTES);
+                return;
             }
+
+            releaseDeferredTrialMinutes(user, subscription);
+            return;
+        }
+
+        if (hasDeferredTrialMinutes(subscription) && isTrialMinutesUnlocked(subscription)) {
+            releaseDeferredTrialMinutes(user, subscription);
+            return;
+        }
+
+        if (hasDeferredTrialMinutes(subscription)) {
+            ensureMinimumMinutes(user, TRIAL_AVAILABLE_MINUTES);
+            return;
+        }
+
+        if (planMinutes > 0) {
+            ensureMinimumMinutes(user, planMinutes);
         } else if (plan == SubscriptionPlan.OPEN_LIBRARY) {
             // Ensure no minutes are given (or reset to 0/standard free limit?)
             // For now, do nothing or set to 0?
@@ -103,6 +130,50 @@ public class PaddleService {
             // But existing logic is "No paid roles".
             // Let's safe-guard against getting free minutes.
             // user.setLessonBuilderMinutes(0); // Optional: force reset on downgrade
+        }
+    }
+
+    private boolean hasDeferredTrialMinutes(Subscription subscription) {
+        return subscription.getDeferredLessonBuilderMinutes() != null
+                && subscription.getDeferredLessonBuilderMinutes() > 0;
+    }
+
+    private boolean isTrialMinutesUnlocked(Subscription subscription) {
+        return subscription.getTrialMinutesUnlockAt() != null
+                && !Instant.now().isBefore(subscription.getTrialMinutesUnlockAt());
+    }
+
+    private int getPlanLessonBuilderMinutes(SubscriptionPlan plan) {
+        if (plan == SubscriptionPlan.SMART) {
+            return 300;
+        }
+        if (plan == SubscriptionPlan.PLUS) {
+            return 600;
+        }
+        return 0;
+    }
+
+    private Instant getTrialMinutesUnlockAt(Subscription subscription) {
+        Instant trialStartedAt = subscription.getCreatedAt() != null ? subscription.getCreatedAt() : Instant.now();
+        return trialStartedAt.plus(TRIAL_DEFERRED_MINUTES_DELAY_DAYS, ChronoUnit.DAYS);
+    }
+
+    private void releaseDeferredTrialMinutes(User user, Subscription subscription) {
+        int deferredMinutes = subscription.getDeferredLessonBuilderMinutes() != null
+                ? subscription.getDeferredLessonBuilderMinutes()
+                : 0;
+        if (deferredMinutes <= 0) {
+            return;
+        }
+
+        int currentMinutes = user.getLessonBuilderMinutes() != null ? user.getLessonBuilderMinutes() : 0;
+        user.setLessonBuilderMinutes(currentMinutes + deferredMinutes);
+        subscription.setDeferredLessonBuilderMinutes(0);
+    }
+
+    private void ensureMinimumMinutes(User user, int minutes) {
+        if (user.getLessonBuilderMinutes() == null || user.getLessonBuilderMinutes() < minutes) {
+            user.setLessonBuilderMinutes(minutes);
         }
     }
 
@@ -202,11 +273,10 @@ public class PaddleService {
             subscription.setCreatedAt(Instant.now());
         }
 
-        subscriptionRepository.save(subscription);
-
         // Update User fields
         user.setPaddleCustomerId(customerId);
-        updateUserLimits(user, plan, status);
+        updateUserLimits(user, subscription);
+        subscriptionRepository.save(subscription);
         userService.saveUser(user);
     }
 
